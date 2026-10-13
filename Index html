@@ -1,1 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexora AI — Interactive Paper Demo</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #131825;
+            --bg-input: #1a2035;
+            --border: #232b42;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+        .balance { font-family: monospace; font-size: 1.1rem; color: var(--success); }
+        .status-badge {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* Layout */
+        .container { display: flex; min-height: calc(100vh - 65px); }
+        .sidebar {
+            width: 220px;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem 0;
+        }
+        .nav-item {
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+        .nav-item.active, .nav-item:hover { background: var(--bg-input); color: var(--text-primary); border-left: 3px solid var(--accent); }
+        
+        .main-content { flex: 1; padding: 2rem; overflow-y: auto; }
+
+        /* Cards & Panels */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;}
+        
+        /* Grids */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+
+        /* Forms */
+        label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem; }
+        select, input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.6rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+        /* Buttons */
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+
+        /* Stats */
+        .stat-box { text-align: center; padding: 1rem; background: var(--bg-input); border-radius: 6px; }
+        .stat-val { font-size: 1.25rem; font-weight: 700; font-family: monospace; }
+        .stat-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+        /* Lists / Logs */
+        .list-container { max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; }
+        .list-item { padding: 0.5rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+        .log-entry { padding: 0.4rem 0; border-bottom: 1px dashed var(--border); font-size: 0.8rem; color: var(--text-secondary); }
+        .log-time { color: var(--accent); margin-right: 0.5rem; }
+
+        /* Disclaimers */
+        .disclaimer { font-size: 0.75rem; color: var(--text-secondary); text-align: center; margin-top: 2rem; padding: 1rem; border-top: 1px solid var(--border);}
+        
+        /* Utility */
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+        .text-warning { color: var(--warning); }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div style="display: flex; align-items: center; gap: 2rem;">
+            <div class="logo">⬡ NEXORA AI</div>
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">DERIV STRATEGY STUDIO</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <div class="balance">$10,000.00 USD</div>
+            <div class="status-badge">● SIMULATED ACCOUNT</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="nav-item active">▦ Overview</div>
+            <div class="nav-item">◎ Strategies</div>
+            <div class="nav-item">⌁ Scanner</div>
+            <div class="nav-item">☷ History</div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="flex-between" style="margin-bottom: 1.5rem;">
+                <div>
+                    <h2 style="margin: 0;">Over 8 Killer</h2>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">OVER / UNDER · digit barrier</span>
+                </div>
+                <div class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border-color: rgba(16, 185, 129, 0.3);">PAPER READY</div>
+            </div>
+
+            <!-- Bot Configuration -->
+            <div class="card">
+                <div class="card-title">Bot Configuration <span style="font-size: 0.8rem; color: var(--text-secondary);">Changes apply to future simulated entries.</span></div>
+                <div class="grid-4" style="margin-bottom: 1rem;">
+                    <div>
+                        <label>Strategy bot</label>
+                        <select id="cfg-strategy">
+                            <option>Over 8 Killer</option>
+                            <option>Matches / Differs</option>
+                            <option>Even / Odd Pulse</option>
+                            <option>Rise / Fall Momentum</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Market</label>
+                        <select id="cfg-market">
+                            <option>Volatility 75 (1s) Index</option>
+                            <option>Volatility 50 (1s) Index</option>
+                            <option>Volatility 100 (1s) Index</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Stake (USD)</label>
+                        <input type="number" id="cfg-stake" value="1.00" step="0.10">
+                    </div>
+                    <div>
+                        <label>Analysis window</label>
+                        <select id="cfg-window">
+                            <option>50 ticks</option>
+                            <option selected>100 ticks</option>
+                            <option>150 ticks</option>
+                            <option>200 ticks</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-4" style="margin-bottom: 1.5rem;">
+                    <div>
+                        <label>Digit barrier</label>
+                        <select id="cfg-barrier">
+                            <option>5</option><option>6</option><option>7</option>
+                            <option selected>8</option><option>9</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Over / Under</label>
+                        <select id="cfg-direction">
+                            <option>Over barrier</option>
+                            <option>Under barrier</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Duration</label>
+                        <select id="cfg-duration">
+                            <option selected>1 tick</option>
+                            <option>2 ticks</option>
+                            <option>3 ticks</option>
+                            <option>5 ticks</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Session max loss (USD)</label>
+                        <input type="number" id="cfg-maxloss" value="100.00">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-ghost" onclick="resetEngine()">↻ Reset</button>
+                    <button class="btn btn-success" id="btn-start" onclick="startSimulation()">▶ Start simulation</button>
+                    <button class="btn btn-danger" id="btn-stop" onclick="stopSimulation()" disabled>■ Stop</button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid-4" style="margin-bottom: 1.5rem;">
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-stake">$0.00</div>
+                    <div class="stat-label">Total stake</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-payout">$0.00</div>
+                    <div class="stat-label">Total payout</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val"><span id="stat-won" class="text-success">0</span> / <span id="stat-lost" class="text-danger">0</span></div>
+                    <div class="stat-label">Contracts won / lost</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-pl">$0.00</div>
+                    <div class="stat-label">Total P/L</div>
+                </div>
+            </div>
+
+            <!-- Transactions & Scanner -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">Transactions</div>
+                    <div class="list-container" id="transactions-list">
+                        <div style="color: var(--text-secondary); text-align: center; padding: 2rem;">No contracts yet. Start the paper engine.</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Market Scanner <span style="font-size: 0.8rem; color: var(--text-secondary);">Synthetic ticks</span></div>
+                    <div class="list-container" id="scanner-list">
+                        <div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Scanner idle</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Engine Activity -->
+            <div class="card">
+                <div class="card-title">Engine Activity <button class="btn btn-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;" onclick="clearLog()">Clear log</button></div>
+                <div class="list-container" id="activity-log">
+                    <div class="log-entry"><span class="log-time">[SYS]</span> Paper simulator loaded. Real-money execution is not available.</div>
+                </div>
+            </div>
+
+            <div class="disclaimer">
+                © 2026 Nexora AI · Interactive test build<br>
+                Paper testing only · no profitability guarantee · Trade results use a fixed illustrative payout model and random outcomes.
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // State
+        let isRunning = false;
+        let intervalId = null;
+        let stats = { stake: 0, payout: 0, won: 0, lost: 0, pl: 0 };
+
+        // DOM Elements
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const txList = document.getElementById('transactions-list');
+        const scanList = document.getElementById('scanner-list');
+        const actLog = document.getElementById('activity-log');
+
+        function logActivity(msg, type = 'INFO') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+            actLog.prepend(entry);
+            if (actLog.children.length > 50) actLog.removeChild(actLog.lastChild);
+        }
+
+        function updateStats() {
+            document.getElementById('stat-stake').innerText = `$${stats.stake.toFixed(2)}`;
+            document.getElementById('stat-payout').innerText = `$${stats.payout.toFixed(2)}`;
+            document.getElementById('stat-won').innerText = stats.won;
+            document.getElementById('stat-lost').innerText = stats.lost;
+            
+            const plEl = document.getElementById('stat-pl');
+            plEl.innerText = `$${stats.pl.toFixed(2)}`;
+            plEl.className = `stat-val ${stats.pl >= 0 ? 'text-success' : 'text-danger'}`;
+        }
+
+        function startSimulation() {
+            if (isRunning) return;
+            isRunning = true;
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            logActivity('Simulation started. Generating synthetic ticks...');
+            
+            // Clear placeholders
+            if (txList.children.length === 1 && txList.children[0].tagName !== 'DIV') txList.innerHTML = '';
+            if (scanList.children.length === 1 && scanList.children[0].tagName !== 'DIV') scanList.innerHTML = '';
+            if (txList.innerText.includes('No contracts')) txList.innerHTML = '';
+            if (scanList.innerText.includes('Scanner idle')) scanList.innerHTML = '';
+
+            intervalId = setInterval(() => {
+                const stake = parseFloat(document.getElementById('cfg-stake').value) || 1;
+                const barrier = parseInt(document.getElementById('cfg-barrier').value);
+                const direction = document.getElementById('cfg-direction').value;
+                
+                // Generate random tick (0-9)
+                const tick = Math.floor(Math.random() * 10);
+                
+                // Add to scanner
+                const scanItem = document.createElement('div');
+                scanItem.className = 'list-item';
+                scanItem.innerHTML = `<span>Tick #${Math.floor(Math.random()*9000 + 1000)}</span> <span style="font-weight:bold; color: var(--accent);">${tick}</span>`;
+                scanList.prepend(scanItem);
+                if (scanList.children.length > 20) scanList.removeChild(scanList.lastChild);
+
+                // Evaluate Trade (Over/Under logic)
+                let isWin = false;
+                if (direction === 'Over barrier') isWin = tick > barrier;
+                else isWin = tick < barrier;
+
+                const payout = isWin ? stake * 1.95 : 0; // Illustrative 1.95x payout
+                const profit = payout - stake;
+
+                stats.stake += stake;
+                stats.payout += payout;
+                stats.pl += profit;
+                if (isWin) stats.won++; else stats.lost++;
+
+                // Add to transactions
+                const txItem = document.createElement('div');
+                txItem.className = 'list-item';
+                txItem.innerHTML = `
+                    <span>${isWin ? 'WIN' : 'LOSS'} | Digit: ${tick}</span>
+                    <span class="${isWin ? 'text-success' : 'text-danger'}">${isWin ? '+' : '-'}$${Math.abs(profit).toFixed(2)}</span>
+                `;
+                txList.prepend(txItem);
+                if (txList.children.length > 20) txList.removeChild(txList.lastChild);
+
+                updateStats();
+
+                // Check risk gates
+                const maxLoss = parseFloat(document.getElementById('cfg-maxloss').value);
+                if (stats.pl <= -maxLoss) {
+                    logActivity(`Risk gate triggered: Max loss limit ($${maxLoss}) reached. Stopping.`, 'WARN');
+                    stopSimulation();
+                }
+            }, 800); // Run every 800ms
+        }
+
+        function stopSimulation() {
+            isRunning = false;
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+            clearInterval(intervalId);
+            logActivity('Simulation stopped by user or risk gate.');
+        }
+
+        function resetEngine() {
+            stopSimulation();
+            stats = { stake: 0, payout: 0, won: 0, lost: 0, pl: 0 };
+            updateStats();
+            txList.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">No contracts yet. Start the paper engine.</div>';
+            scanList.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Scanner idle</div>';
+            logActivity('Engine reset. All statistics cleared.');
+        }
+
+        function clearLog() {
+            actLog.innerHTML = '';
+            logActivity('Log cleared.');
+        }
+    </script>
+</body>
+</html>
