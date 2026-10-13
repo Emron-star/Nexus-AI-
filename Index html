@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nexora Bot - Deriv Auto Trader</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#1b2430;--mut:#6b7785;--ln:#e2e7ec;--ac:#0e9aa7;--ok:#0a8a4a;--bad:#c62828;--wn:#fff4e0}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1419;--card:#16202a;--tx:#e8eef3;--mut:#8da0b0;--ln:#25323e;--wn:#2b2314}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif;padding-bottom:30px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--card);border-bottom:1px solid var(--ln);position:sticky;top:0;z-index:5}
+h1{font-size:17px;margin:0;color:var(--ac)}.chip{border:1px solid var(--ln);border-radius:20px;padding:6px 12px;font:600 13px ui-monospace,monospace}
+.chip small{display:block;color:var(--mut);font:11px system-ui}
+main{max-width:520px;margin:0 auto;padding:12px}.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:15px;margin:0 0 10px}label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--ln);border-radius:10px;background:var(--bg);color:var(--tx);font-size:14px}
+.row{display:grid;gap:8px}.r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:repeat(3,1fr)}
+.opt{padding:10px 6px;border:1px solid var(--ln);border-radius:10px;background:var(--bg);color:var(--tx);text-align:center;cursor:pointer;font-size:13px}
+.opt.on{border-color:var(--ac);background:rgba(14,154,167,.14);font-weight:600}
+.note{background:var(--wn);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:8px}
+button.main{width:100%;padding:13px;border:0;border-radius:12px;font-size:15px;font-weight:700;color:#fff;background:linear-gradient(90deg,#7b4dff,#ff8a2b);cursor:pointer;margin-top:12px}
+button.main:disabled{opacity:.5}.bt{padding:7px 12px;border-radius:8px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);cursor:pointer}
+.stop{color:var(--bad);border-color:var(--bad)}.hide{display:none!important}
+.tx{display:flex;justify-content:space-between;padding:9px 10px;border:1px solid var(--ln);border-radius:10px;margin-bottom:6px;font-size:13px}
+.tx small{display:block;color:var(--mut);font-size:11px}.w{color:var(--ok);font-weight:700}.l{color:var(--bad);font-weight:700}
+#list{max-height:300px;overflow:auto}.st{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.st div{border:1px solid var(--ln);border-radius:10px;padding:8px;font:700 13px ui-monospace,monospace}.st span{display:block;font:600 10px system-ui;color:var(--mut);text-transform:uppercase}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9;padding:20px}
+#modal .box{background:var(--card);border-radius:16px;padding:22px;max-width:340px;width:100%;text-align:center}
+#msg{font-size:12px;color:var(--mut);margin-top:8px;min-height:16px}
+</style></head><body>
+<header><h1>Nexora Bot</h1><div class="chip" id="bal">-<small id="acct">Not connected</small></div></header>
+<main>
+<div class="card" id="conn"><h2>Connect to Deriv</h2>
+<label>Method</label><select id="meth"><option value="legacy">Legacy API token (app_id + token)</option><option value="new">New API (App ID + Personal Access Token)</option></select>
+<label>App ID (1089 works for testing the legacy method)</label><input id="appid" inputmode="numeric" placeholder="1089">
+<label>API token (needs Trade scope; a demo-account token is recommended)</label><input id="tok" type="password" autocomplete="off" placeholder="paste token">
+<label class="new hide">Account type (new API only)</label><select id="atype" class="new hide"><option value="demo">Demo</option><option value="real">Real</option></select>
+<button class="main" id="go">Connect</button><div id="msg"></div></div>
+
+<div class="card hide" id="bot"><h2>Nexora Bot <span class="chip" id="mode" style="font-size:11px;padding:2px 8px"></span></h2>
+<label>Strategy</label><div class="row r3" id="strat"></div>
+<label>Market</label><select id="sym"></select>
+<div class="row r2"><div><label>Duration (ticks)</label><input id="dur" type="number" min="1" value="1"></div>
+<div id="barw"><label>Barrier digit (Over/Under)</label><input id="bar" type="number" min="1" max="8" value="3"></div></div>
+<label>Risk level</label><div class="row r3" id="risk"></div><div class="note" id="rnote"></div>
+<div class="row r3"><div><label>Stake (USD)</label><input id="stake" type="number" min="0.35" step="0.01" value="1"></div>
+<div><label>Profit target</label><input id="tp" type="number" min="1" value="10"></div>
+<div><label>Stop loss</label><input id="sl" type="number" min="1" value="10"></div></div>
+<label id="realack" class="hide"><input type="checkbox" id="ack" style="width:auto"> This is a REAL account. I accept I can lose my stake.</label>
+<button class="main" id="run">Run Bot</button>
+<div class="note">Digits and ticks on synthetic indices are random. The signal engine is a Markov-chain estimator, and no strategy has a guaranteed edge. Test on demo first.</div></div>
+
+<div class="card hide" id="txc"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Transactions</h2>
+<div><button class="bt stop" id="stp">Stop</button> <button class="bt" id="rst">Reset</button></div></div>
+<div id="status" style="font-size:12px;color:var(--mut);margin:8px 0">Idle</div><div id="list"></div>
+<div class="st"><div><span>Total stake</span><b id="s1">0.00</b></div><div><span>Total payout</span><b id="s2">0.00</b></div><div><span>No. of runs</span><b id="s3">0</b></div>
+<div><span>Contracts lost</span><b id="s4">0</b></div><div><span>Contracts won</span><b id="s5">0</b></div><div><span>Total P/L</span><b id="s6">0.00</b></div></div></div>
+</main>
+<div id="modal" class="hide"><div class="box"><h2 id="mt"></h2><p id="mb"></p><button class="main" id="mok">OK</button></div></div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const STRATS=[['rf','Rise / Fall'],['eo','Even / Odd'],['ou','Over / Under'],['md','Matches / Differs'],['mix','Mix Both'],['ai','Smart AI']];
+const SYMS=[['1HZ100V','Volatility 100 (1s)'],['1HZ75V','Volatility 75 (1s)'],['1HZ50V','Volatility 50 (1s)'],['1HZ25V','Volatility 25 (1s)'],['1HZ10V','Volatility 10 (1s)'],['R_100','Volatility 100 Index'],['R_75','Volatility 75 Index'],['R_50','Volatility 50 Index'],['R_25','Volatility 25 Index'],['R_10','Volatility 10 Index']];
+const RISK={low:{n:'Low',m:1,c:0,t:'Flat stake, no martingale.'},medium:{n:'Medium',m:1.5,c:2,t:'Martingale x1.5 on loss (capped at 2 steps).'},high:{n:'High',m:2,c:3,t:'Martingale x2 on loss (capped at 3 steps).'}};
+let ws,A={strat:'ai',risk:'medium'},S;
+const fresh=()=>({run:false,busy:false,step:0,mix:0,digits:[],prices:[],pip:2,cur:'USD',virt:true,bal:0,poc:null,tx:[],st:{stake:0,pay:0,runs:0,won:0,lost:0,pl:0},baseStake:1,tp:0,sl:0});
+S=fresh();
+const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
+const msg=t=>$('#msg').textContent=t, status=t=>$('#status').textContent=t;
+function build(){
+ $('#strat').innerHTML=STRATS.map(([k,n])=>`<div class="opt ${A.strat===k?'on':''}" data-k="${k}">${n}${k==='ai'?'<br><small>recommended</small>':''}</div>`).join('');
+ $('#risk').innerHTML=Object.entries(RISK).map(([k,r])=>`<div class="opt ${A.risk===k?'on':''}" data-r="${k}">${r.n}</div>`).join('');
+ $('#rnote').textContent=RISK[A.risk].t;$('#barw').style.opacity=A.strat==='ou'||A.strat==='ai'?1:.4;
+ $$('#strat .opt').forEach(e=>e.onclick=()=>{A.strat=e.dataset.k;build()});$$('#risk .opt').forEach(e=>e.onclick=()=>{A.risk=e.dataset.r;build()});
+}
+$('#sym').innerHTML=SYMS.map(([k,n])=>`<option value="${k}">${n}</option>`).join('');build();
+try{$('#appid').value=localStorage.getItem('nx_app')||''}catch(e){}
+$('#meth').onchange=()=>$$('.new').forEach(e=>e.classList.toggle('hide',$('#meth').value!=='new'));
+
+async function connect(){
+ const app=$('#appid').value.trim(),tok=$('#tok').value.trim();if(!app||!tok)return msg('Enter App ID and token.');
+ try{localStorage.setItem('nx_app',app)}catch(e){}
+ $('#go').disabled=true;msg('Connecting...');
+ try{
+  if($('#meth').value==='legacy'){ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+encodeURIComponent(app));ws.onopen=()=>send({authorize:tok});}
+  else{
+   const H={Authorization:'Bearer '+tok,'Deriv-App-ID':app},B='https://api.derivws.com/trading/v1/options/accounts';
+   const want=$('#atype').value;let r=await fetch(B,{headers:H});let j=await r.json();if(!r.ok)throw new Error(JSON.stringify(j).slice(0,160));
+   const list=j.data||[];const isDemo=a=>/demo|virtual/i.test(JSON.stringify(a));
+   const pick=list.find(a=>want==='demo'?isDemo(a):!isDemo(a))||list[0];if(!pick)throw new Error('No Options account found.');
+   const id=pick.account_id||pick.id||pick.loginid;r=await fetch(B+'/'+id+'/otp',{method:'POST',headers:H});j=await r.json();
+   if(!r.ok||!j.data||!j.data.url)throw new Error(JSON.stringify(j).slice(0,160));
+   S.virt=/\/demo/.test(j.data.url);ws=new WebSocket(j.data.url);ws.onopen=()=>{ready(pick.currency||'USD',id)};
+  }
+  ws.onmessage=e=>onMsg(JSON.parse(e.data));
+  ws.onclose=()=>{status('Disconnected');if(S.run)stop('Connection lost. Bot stopped.')};
+  ws.onerror=()=>{msg('Connection failed. Check App ID/token and network.');$('#go').disabled=false};
+ }catch(e){msg('Error: '+e.message);$('#go').disabled=false}
+}
+function ready(cur,id){
+ S.cur=cur||'USD';$('#acct').textContent=(S.virt?'Demo account':'Real account')+(id?' '+id:'');$('#mode').textContent=S.virt?'DEMO':'REAL';
+ $('#realack').classList.toggle('hide',S.virt);$('#conn').classList.add('hide');$('#bot').classList.remove('hide');$('#txc').classList.remove('hide');
+ send({balance:1,subscribe:1});loadSym();setInterval(()=>send({ping:1}),30000);
+}
+function loadSym(){send({forget_all:'ticks'});S.digits=[];S.prices=[];send({ticks_history:$('#sym').value,count:1000,end:'latest',style:'ticks'});}
+$('#sym').onchange=loadSym;
+const dg=q=>+Number(q).toFixed(S.pip).slice(-1);
+function onMsg(m){
+ if(m.error){const t=m.error.message||'Error';if(m.msg_type==='authorize'){msg('Auth failed: '+t);$('#go').disabled=false}else if(m.msg_type==='buy'){status('Buy rejected: '+t);S.busy=false;if(S.run)stop('Buy rejected: '+t)}else status(t);return}
+ switch(m.msg_type){
+  case 'authorize':{const a=m.authorize;S.virt=!!a.is_virtual;ready(a.currency,a.loginid);break}
+  case 'balance':S.bal=m.balance.balance;S.cur=m.balance.currency||S.cur;$('#bal').firstChild.textContent=S.bal.toFixed(2)+' '+S.cur;break;
+  case 'history':S.pip=m.pip_size||m.history.pip_size||S.pip;S.prices=m.history.prices.map(Number);S.digits=S.prices.map(dg);send({ticks:$('#sym').value,subscribe:1});status('Ready. '+S.digits.length+' ticks loaded.');break;
+  case 'tick':{if(m.echo_req&&m.echo_req.ticks&&m.echo_req.ticks!==$('#sym').value)break;S.pip=m.tick.pip_size||S.pip;S.prices.push(+m.tick.quote);S.digits.push(dg(m.tick.quote));if(S.digits.length>1000){S.digits.shift();S.prices.shift()}if(S.run&&!S.busy)trade();break}
+  case 'buy':{S.poc=m.buy.contract_id;S.lastBuy=m.buy.buy_price;send({proposal_open_contract:1,contract_id:S.poc,subscribe:1});status('Contract open: '+m.buy.longcode);break}
+  case 'proposal_open_contract':{const c=m.proposal_open_contract;if(!c||c.contract_id!==S.poc||!c.is_sold)break;if(m.subscription)send({forget:m.subscription.id});settle(c);break}
+ }
+}
+function trans(d){const M=Array.from({length:10},()=>Array(10).fill(1));for(let i=1;i<d.length;i++)M[d[i-1]][d[i]]++;const r=M[d[d.length-1]],t=r.reduce((a,b)=>a+b,0);return r.map(x=>x/t)}
+function dirP(){const P=S.prices,C=[[1,1],[1,1]];for(let i=2;i<P.length;i++){const a=P[i-1]>P[i-2]?1:0,b=P[i]>P[i-1]?1:0;C[a][b]++}const l=P.length-1,cur=P[l]>P[l-1]?1:0,t=C[cur][0]+C[cur][1];return{up:C[cur][1]/t,dn:C[cur][0]/t}}
+function signal(){
+ if(S.digits.length<100){return null}
+ let mode=A.strat;if(mode==='mix'){mode=S.mix++%2?'eo':'rf'}
+ const p=trans(S.digits),sum=f=>p.reduce((a,x,i)=>a+(f(i)?x:0),0),B=Math.min(8,Math.max(1,+$('#bar').value||3));
+ const mx=Math.max(...p),mn=Math.min(...p),amax=p.indexOf(mx),amin=p.indexOf(mn);
+ const c={EVEN:{t:'DIGITEVEN',e:sum(i=>i%2===0)-.5,l:'Even'},ODD:{t:'DIGITODD',e:sum(i=>i%2===1)-.5,l:'Odd'},
+  OVER:{t:'DIGITOVER',b:B,e:sum(i=>i>B)-(9-B)/10,l:'Over '+B},UNDER:{t:'DIGITUNDER',b:B,e:sum(i=>i<B)-B/10,l:'Under '+B},
+  MATCH:{t:'DIGITMATCH',b:amax,e:mx-.1,l:'Matches '+amax},DIFF:{t:'DIGITDIFF',b:amin,e:(1-mn)-.9,l:'Differs '+amin}};
+ const best=(...k)=>k.map(x=>c[x]).sort((a,b)=>b.e-a.e)[0];
+ if(mode==='rf'){const d=dirP();return d.up>=d.dn?{t:'CALL',l:'Rise'}:{t:'PUT',l:'Fall'}}
+ if(mode==='eo')return best('EVEN','ODD');if(mode==='ou')return best('OVER','UNDER');if(mode==='md')return best('MATCH','DIFF');
+ const r=best('EVEN','ODD','OVER','UNDER','MATCH','DIFF');return r.e>0?r:null;
+}
+function stakeNow(){const r=RISK[A.risk];return +(S.baseStake*Math.pow(r.m,Math.min(S.step,r.c))).toFixed(2)}
+function trade(){
+ const s=signal();if(!s){status('Scanning the market... ('+S.digits.length+'/100 ticks)');return}
+ const amt=stakeNow();if(amt>S.bal)return stop('Next stake ('+amt.toFixed(2)+') exceeds balance. Bot stopped.');
+ S.busy=true;status('Placing '+s.l+' @ '+amt.toFixed(2)+'...');
+ const P={amount:amt,basis:'stake',contract_type:s.t,currency:S.cur,duration:Math.max(1,+$('#dur').value||1),duration_unit:'t',symbol:$('#sym').value};
+ if(s.b!=null)P.barrier=String(s.b);send({buy:1,price:amt,parameters:P});S.cur2=s.l;
+}
+function settle(c){
+ const p=+c.profit,st=S.st;st.stake+=+c.buy_price;st.pay+=+c.sell_price;st.runs++;st.pl+=p;p>0?st.won++:st.lost++;
+ const r=RISK[A.risk];S.step=p>0?0:Math.min(S.step+1,r.c);
+ S.tx.unshift({n:c.display_name||$('#sym').selectedOptions[0].text,l:S.cur2,s:+c.buy_price,p});render();S.busy=false;S.poc=null;
+ if(st.pl>=S.tp)return done('Congratulations!','Target profit reached. Net profit '+st.pl.toFixed(2)+' '+S.cur);
+ if(st.pl<=-S.sl)return done('Stop loss hit','Net result '+st.pl.toFixed(2)+' '+S.cur);
+ status('Waiting for next signal...');
+}
+function done(t,b){stop();$('#mt').textContent=t;$('#mb').innerHTML=b+'<br>'+S.st.runs+' trades, '+S.st.won+' wins, '+S.st.lost+' losses';$('#modal').classList.remove('hide')}
+function render(){const st=S.st;$('#s1').textContent=st.stake.toFixed(2);$('#s2').textContent=st.pay.toFixed(2);$('#s3').textContent=st.runs;$('#s4').textContent=st.lost;$('#s5').textContent=st.won;
+ const e=$('#s6');e.textContent=(st.pl>=0?'+':'')+st.pl.toFixed(2);e.className=st.pl>=0?'w':'l';
+ $('#list').innerHTML=S.tx.slice(0,60).map(t=>`<div class="tx"><div>${t.n}<small>${t.l} - stake ${t.s.toFixed(2)}</small></div><div class="${t.p>0?'w':'l'}">${t.p>0?'+':''}${t.p.toFixed(2)}</div></div>`).join('')}
+function start(){
+ if(!S.virt&&!$('#ack').checked)return status('Tick the real-account box to continue.');
+ S.baseStake=+$('#stake').value;S.tp=+$('#tp').value;S.sl=+$('#sl').value;if(!(S.baseStake>=.35))return status('Minimum stake is 0.35.');
+ S.run=true;S.busy=false;S.step=0;$('#run').disabled=true;$('#run').textContent='Running...';status('Scanning the market...');if(S.digits.length)trade();
+}
+function stop(t){S.run=false;$('#run').disabled=false;$('#run').textContent='Run Bot';status(t||'Stopped')}
+$('#go').onclick=connect;$('#run').onclick=start;$('#stp').onclick=()=>stop();
+$('#rst').onclick=()=>{if(S.run)stop();const k={digits:S.digits,prices:S.prices,pip:S.pip,cur:S.cur,virt:S.virt,bal:S.bal};S=Object.assign(fresh(),k);render();status('Reset')};
+$('#mok').onclick=()=>$('#modal').classList.add('hide');
+</script></body></html>
